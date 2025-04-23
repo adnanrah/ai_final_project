@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 
 print("adnan adnan")
+print("Akshay Kulkarni")
 
 # Sample data structure for food items
 food_data = {
