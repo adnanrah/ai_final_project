@@ -7,6 +7,8 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.preprocessing import LabelEncoder
 from sklearn.pipeline import Pipeline
 
+# Test
+
 class FoodCategorizer:
     """
     Uses Naive Bayes to categorize food items based on their descriptions
