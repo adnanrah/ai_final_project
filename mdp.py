@@ -792,6 +792,9 @@ class MealPlannerMDP:
             'calories': 0, 'protein': 0, 'fat': 0, 'carbs': 0
         }
         
+        # Track recently used meals to avoid repetition
+        recent_meals = set()
+        
         # Plan meals
         meal_plan = []
         
@@ -804,19 +807,41 @@ class MealPlannerMDP:
             }
             
             for meal_type in meal_types:
-                # Recommend a meal for this meal type
-                meal = self.recommend_meal(meal_type=meal_type)
-                
-                if meal:
-                    daily_meals.append(meal)
+                # Try to recommend a meal that hasn't been used recently
+                max_attempts = 5  # Limit attempts to avoid infinite loop
+                for attempt in range(max_attempts):
+                    meal = self.recommend_meal(meal_type=meal_type)
                     
-                    # Update daily nutrition consumed
-                    for nutrient in ['calories', 'protein', 'fat', 'carbs']:
-                        if nutrient in meal and not pd.isna(meal[nutrient]):
-                            self.daily_nutrition_consumed[nutrient] += float(meal[nutrient])
+                    if not meal:
+                        break
+                        
+                    # Check if this meal was recently used
+                    meal_id = meal.get('food_id', str(meal.get('name', '')))
+                    if meal_id not in recent_meals:
+                        daily_meals.append(meal)
+                        recent_meals.add(meal_id)
+                        
+                        # Update daily nutrition consumed
+                        for nutrient in ['calories', 'protein', 'fat', 'carbs']:
+                            if nutrient in meal and not pd.isna(meal[nutrient]):
+                                self.daily_nutrition_consumed[nutrient] += float(meal[nutrient])
+                        
+                        # Update current state based on nutrition balance
+                        self._update_state_based_on_nutrition()
+                        break
                     
-                    # Update current state based on nutrition balance
-                    self._update_state_based_on_nutrition()
+                    # If we've tried too many times, just use the last recommendation
+                    if attempt == max_attempts - 1:
+                        daily_meals.append(meal)
+                        recent_meals.add(meal_id)
+                        
+                        # Update daily nutrition consumed
+                        for nutrient in ['calories', 'protein', 'fat', 'carbs']:
+                            if nutrient in meal and not pd.isna(meal[nutrient]):
+                                self.daily_nutrition_consumed[nutrient] += float(meal[nutrient])
+                        
+                        # Update current state based on nutrition balance
+                        self._update_state_based_on_nutrition()
             
             meal_plan.append(daily_meals)
         
