@@ -5,9 +5,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 
-def scrape_o_hill_menu():
-    """Scrape all food names from Observatory Hill Dining Room menu"""
-    url = "https://virginia.campusdish.com/LocationsAndMenus/ObservatoryHillDiningRoom"
+def scrape_dining_hall(url, hall_name):
+    """Scrape food names from a specific dining hall"""
+    print(f"\nScraping {hall_name}...")
     
     # Set up Selenium with Chrome
     options = Options()
@@ -18,7 +18,7 @@ def scrape_o_hill_menu():
     driver = webdriver.Chrome(options=options)
     
     try:
-        print("Navigating to the dining hall page...")
+        print(f"Navigating to {hall_name} page...")
         driver.get(url)
         
         print("Waiting for page to load...")
@@ -41,10 +41,12 @@ def scrape_o_hill_menu():
                 'diets', 'check', 'today', 'button', 'change'
             ];
             
-            // Food stations to filter out
+            // Food stations to filter out - updated to include stations from all dining halls
             const stationNames = [
                 'the iron skillet', 'copper hood', 'green fork', 'trattoria', 
-                'under the hood', 'desserts', 'breakfast', 'lunch', 'dinner'
+                'under the hood', 'desserts', 'breakfast', 'lunch', 'dinner',
+                'salad bar', 'grill', 'pizza', 'deli', 'international', 'home zone',
+                'sweets', 'beverages', 'fresh market', 'pasta', 'bakery'
             ];
             
             // Function to check if an item is likely a food
@@ -115,9 +117,9 @@ def scrape_o_hill_menu():
                 }
             }
             
-            // Final check - look for items from your screenshots
-            const specificFoods = ['Sweet Chili Pork', 'Veggie Lo Mein', 'Roasted Veggies'];
-            for (const foodName of specificFoods) {
+            // Final check - look for any common food items
+            const commonFoods = ['Pizza', 'Burger', 'Sandwich', 'Salad', 'Pasta', 'Chicken', 'Vegetable'];
+            for (const foodName of commonFoods) {
                 const elements = document.evaluate(
                     `//*[contains(text(), '${foodName}')]`,
                     document,
@@ -182,36 +184,60 @@ def scrape_o_hill_menu():
                           'taco', 'burrito', 'egg', 'oatmeal', 'pancake', 'waffle', 'syrup', 'toast',
                           'bagel', 'muffin', 'biscuit', 'gravy', 'potato', 'fries', 'tots', 'veggie',
                           'fruit', 'cheese', 'yogurt', 'cereal', 'granola', 'noodle', 'stir-fry',
-                          'roasted', 'grilled', 'fried', 'baked', 'sautéed', 'steamed', 'sauce']
+                          'roasted', 'grilled', 'fried', 'baked', 'sautéed', 'steamed', 'sauce',
+                          'bowl', 'dinner', 'lunch', 'breakfast', 'entree', 'dessert', 'pie', 'cake',
+                          'cookie', 'brownie', 'ice cream', 'parfait', 'crouton', 'bean', 'lentil',
+                          'bbq', 'barbecue', 'tofu', 'tempeh', 'vegan', 'gluten-free', 'organic']
         
         for item in food_items:
             # Check if the item contains any food keywords
             if any(keyword in item.lower() for keyword in food_keywords):
                 filtered_items.append(item)
-            # Also include items from your screenshots as they're confirmed food items
-            elif item in ['Sweet Chili Pork', 'Veggie Lo Mein', 'Roasted Veggies']:
+            # Special case for O'Hill items from your screenshots
+            elif hall_name == "Observatory Hill" and item in ['Sweet Chili Pork', 'Veggie Lo Mein', 'Roasted Veggies']:
+                filtered_items.append(item)
+            # Special case for items that sound like food but may not contain keywords
+            elif len(item.split()) >= 2 and item[0].isupper():
+                # Items that are capitalized and have multiple words are likely food names
+                # This is a heuristic but helps catch items like "French Toast" that may not have keywords
                 filtered_items.append(item)
         
         return filtered_items
         
     except Exception as e:
-        print(f"Error during scraping: {e}")
+        print(f"Error during scraping {hall_name}: {e}")
         return []
     finally:
         driver.quit()
 
 def main():
     print("Starting to scrape UVA dining hall menus...")
-    food_items = scrape_o_hill_menu()
     
-    # Save to JSON
-    with open("ohill_foods.json", 'w') as f:
-        json.dump({"Observatory Hill": food_items}, f, indent=4)
+    # Define dining halls to scrape
+    dining_halls = {
+        "Observatory Hill": "https://virginia.campusdish.com/LocationsAndMenus/ObservatoryHillDiningRoom",
+        "Fresh Food Company": "https://virginia.campusdish.com/LocationsAndMenus/FreshFoodCompany",
+        "Runk": "https://virginia.campusdish.com/LocationsAndMenus/Runk"
+    }
     
-    # Print results
-    print(f"\nObservatory Hill - {len(food_items)} items found:")
-    for food in food_items:
-        print(f"  - {food}")
+    # Store all results
+    all_food_items = {}
+    
+    # Scrape each dining hall
+    for hall_name, url in dining_halls.items():
+        food_items = scrape_dining_hall(url, hall_name)
+        all_food_items[hall_name] = food_items
+        
+        # Print results for this dining hall
+        print(f"\n{hall_name} - {len(food_items)} items found:")
+        for food in food_items:
+            print(f"  - {food}")
+    
+    # Save all results to a single JSON file
+    with open("uva_dining_foods.json", 'w') as f:
+        json.dump(all_food_items, f, indent=4)
+    
+    print("\nAll dining hall data saved to uva_dining_foods.json")
 
 if __name__ == "__main__":
     main()
