@@ -1,12 +1,3 @@
-import numpy as np
-import pandas as pd
-from collections import defaultdict, Counter
-from typing import Dict, List, Tuple, Any, Union, Optional
-import json
-import logging
-import random
-from datetime import datetime, timedelta
-
 def modify_mdp_planner():
     """
     Modify the MealPlannerMDP class to improve learning and variety
@@ -14,15 +5,14 @@ def modify_mdp_planner():
     This function is intended to be imported and run to patch the existing MDP code
     """
     from mdp import MealPlannerMDP
+    import numpy as np
+    from datetime import datetime
     
     # Add a meal history tracking attribute to the class initialization
     original_init = MealPlannerMDP.__init__
     
     def enhanced_init(self, food_db, user_preferences):
-        # Call the original init first
-        original_init(self, food_db, user_preferences)
-        
-        # Add new attributes for better tracking and variety
+        # Set up new attributes first
         self.recommended_items = set()  # Track all recommended items to avoid repetition
         self.meal_type_history = {
             'breakfast': [],
@@ -32,6 +22,9 @@ def modify_mdp_planner():
         self.variety_weight = 2.0  # Weight for variety in recommendations
         self.learning_rate = 0.4  # How quickly the model learns from feedback
         self.explore_rate = 0.2  # Probability of exploring new options
+        
+        # Then call the original init
+        original_init(self, food_db, user_preferences)
     
     # Replace the original init
     MealPlannerMDP.__init__ = enhanced_init
@@ -45,7 +38,7 @@ def modify_mdp_planner():
         rewards = original_rewards(self)
         
         # Add variety factor to rewards
-        for state, action in rewards.keys():
+        for state, action in list(rewards.keys()):  # Create a copy of keys to iterate over
             # Decrease reward for recently recommended items
             if action in self.recommended_items:
                 rewards[(state, action)] -= self.variety_weight
@@ -191,7 +184,7 @@ def modify_mdp_planner():
                     ingredients = food_item.get('ingredients', [])
                     
                     # Boost items with similar category or ingredients
-                    for s, a in self.rewards.keys():
+                    for s, a in list(self.rewards.keys()):  # Create a copy of keys to iterate over
                         if s.startswith(f"{meal_type}_"):
                             # Find this action's food
                             for idx, row in self.food_db.iterrows():

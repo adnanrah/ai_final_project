@@ -32,8 +32,9 @@ def test_meal_variety():
         if 'items' in hall_data:
             for item in hall_data['items']:
                 if isinstance(item, dict):
-                    # Add dining hall info
-                    item['dining_hall'] = hall_name
+                    # Add dining hall info if not present
+                    if 'dining_hall' not in item:
+                        item['dining_hall'] = hall_name
                     
                     # Generate food ID if not present
                     if 'food_id' not in item:
@@ -54,13 +55,16 @@ def test_meal_variety():
             'protein': 120,
             'fat': 65,
             'carbs': 250
+        },
+        'meal_preferences': {
+            'breakfast': ['high-protein', 'quick'],
+            'lunch': ['balanced', 'vegetarian'],
+            'dinner': ['high-protein', 'low-carb']
         }
     }
     
     # Create and train the enhanced MDP planner
     planner = EnhancedMealPlannerMDP(food_df, user_prefs)
-    planner.value_iteration()
-    planner.extract_policy()
     
     # Generate a 5-day meal plan
     print("\nGenerating meal plan for 5 days...")
@@ -73,26 +77,28 @@ def test_meal_variety():
     for day, meals in enumerate(meal_plan, 1):
         print(f"\nDay {day}:")
         for i, meal in enumerate(meals):
-            meal_type = ["Breakfast", "Lunch", "Dinner"][i]
-            name = meal.get('name', 'Unknown')
-            print(f"  {meal_type}: {name}")
-            
-            # Track repetition
-            if name not in recommended_items:
-                recommended_items[name] = 1
-            else:
-                recommended_items[name] += 1
+            if i < len(["Breakfast", "Lunch", "Dinner"]):
+                meal_type = ["Breakfast", "Lunch", "Dinner"][i]
+                name = meal.get('name', 'Unknown')
+                print(f"  {meal_type}: {name}")
+                
+                # Track repetition
+                if name not in recommended_items:
+                    recommended_items[name] = 1
+                else:
+                    recommended_items[name] += 1
     
     # Check for repetition
     repeat_count = sum(1 for count in recommended_items.values() if count > 1)
-    total_items = len(meal_plan) * 3  # 3 meals per day
+    total_items = sum(len(day_meals) for day_meals in meal_plan)  # Count actual meals
     unique_items = len(recommended_items)
     
     print(f"\nVariety Analysis:")
     print(f"Total meals recommended: {total_items}")
     print(f"Unique items recommended: {unique_items}")
     print(f"Items that repeated: {repeat_count}")
-    print(f"Variety score: {unique_items/total_items:.2f} (higher is better)")
+    if total_items > 0:
+        print(f"Variety score: {unique_items/total_items:.2f} (higher is better)")
     
     # Test user feedback
     print("\nTesting user feedback...")
@@ -104,7 +110,7 @@ def test_meal_variety():
     new_plan = planner.plan_meals(days=2)
     
     # Give feedback on a few items
-    if new_plan and new_plan[0]:
+    if new_plan and len(new_plan) > 0 and len(new_plan[0]) > 0:
         # Like the first breakfast
         breakfast_id = new_plan[0][0].get('food_id')
         print(f"Giving positive feedback (rating 5) to: {new_plan[0][0].get('name')}")
@@ -124,8 +130,9 @@ def test_meal_variety():
     for day, meals in enumerate(feedback_plan, 1):
         print(f"\nDay {day}:")
         for i, meal in enumerate(meals):
-            meal_type = ["Breakfast", "Lunch", "Dinner"][i]
-            print(f"  {meal_type}: {meal.get('name')}")
+            if i < len(["Breakfast", "Lunch", "Dinner"]):
+                meal_type = ["Breakfast", "Lunch", "Dinner"][i]
+                print(f"  {meal_type}: {meal.get('name')}")
 
 if __name__ == "__main__":
     test_meal_variety()
