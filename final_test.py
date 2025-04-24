@@ -233,7 +233,7 @@ def test_meal_recommendation_system():
     system.meal_planner.reset_meal_history()
     
     # Generate a new plan
-    new_plan = system.recommend_meals(days=2)
+    new_plan = system.recommend_meals(days=7)
     
     # Give feedback on a few items
     if new_plan and len(new_plan) > 0 and len(new_plan[0]) > 0:
@@ -250,7 +250,7 @@ def test_meal_recommendation_system():
     
     # Generate another plan after feedback
     print("\nGenerating new plan after feedback...")
-    feedback_plan = system.recommend_meals(days=2)
+    feedback_plan = system.recommend_meals(days=7)
     
     # Print the new plan
     for day, meals in enumerate(feedback_plan, 1):
