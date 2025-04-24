@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 import sys
 import requests
+import os
 
 # Try importing required packages with error handling
 try:
@@ -46,11 +47,11 @@ except ImportError:
     
     tqdm = SimpleTqdm
 
-# API key - replace with your actual API key (don't include "Bearer " prefix)
-API_KEY = "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"  # Replace this with your actual key
+# Get API key from environment variable or use placeholder for mock data
+API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # Initialize the OpenAI client if the package is available
-if openai is not None:
+if openai is not None and API_KEY:
     client = openai.OpenAI(api_key=API_KEY)
 
 def load_food_data(filename="uva_dining_foods.json"):
@@ -104,6 +105,10 @@ def get_food_info_from_llm(food_name, dining_hall):
     """
     
     try:
+        # Check if API key is available
+        if not API_KEY:
+            raise Exception("No API key provided. Set OPENAI_API_KEY environment variable.")
+            
         # Handle the case where openai package is not available or not initialized
         if openai is None:
             # Fallback to using requests library
@@ -327,8 +332,8 @@ def main():
     
     # Check if API key is set
     use_mock = False
-    if API_KEY == "your-actual-api-key-here":
-        print("WARNING: You need to replace 'your-actual-api-key-here' with your actual OpenAI API key.")
+    if not API_KEY:
+        print("WARNING: No OpenAI API key found in environment variables.")
         print("Continuing with mock data generation instead of API calls.")
         use_mock = True
     
@@ -343,7 +348,7 @@ def main():
     
     if use_mock:
         print("\nNOTE: The saved data contains mock nutritional information for demonstration purposes.")
-        print("To get actual nutritional estimates, update the API_KEY variable with your OpenAI API key.")
+        print("To get actual nutritional estimates, set the OPENAI_API_KEY environment variable.")
     
     print("Food data enrichment complete!")
 
