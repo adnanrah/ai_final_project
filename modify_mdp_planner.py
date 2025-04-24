@@ -6,7 +6,7 @@ def modify_mdp_planner():
     """
     from mdp import MealPlannerMDP
     import numpy as np
-    from datetime import datetime
+    from datetime import datetime, timedelta
     
     # Add a meal history tracking attribute to the class initialization
     original_init = MealPlannerMDP.__init__
@@ -19,9 +19,11 @@ def modify_mdp_planner():
             'lunch': [],
             'dinner': []
         }  # Track meal history by type
-        self.variety_weight = 2.0  # Weight for variety in recommendations
+        self.item_cooldown = {}  # Track when items were last recommended
+        self.variety_weight = 5.0  # Increased weight for variety in recommendations
         self.learning_rate = 0.4  # How quickly the model learns from feedback
-        self.explore_rate = 0.2  # Probability of exploring new options
+        self.explore_rate = 0.3  # Increased probability of exploring new options
+        self.cooldown_days = 3  # Number of days before an item can be recommended again
         
         # Then call the original init
         original_init(self, food_db, user_preferences)
@@ -39,6 +41,15 @@ def modify_mdp_planner():
         
         # Add variety factor to rewards
         for state, action in list(rewards.keys()):  # Create a copy of keys to iterate over
+            # Check cooldown period
+            if action in self.item_cooldown:
+                last_recommended = self.item_cooldown[action]
+                days_since_last = (datetime.now() - last_recommended).days
+                if days_since_last < self.cooldown_days:
+                    # Strong penalty for items still in cooldown
+                    cooldown_penalty = self.variety_weight * (self.cooldown_days - days_since_last) / self.cooldown_days
+                    rewards[(state, action)] -= cooldown_penalty
+            
             # Decrease reward for recently recommended items
             if action in self.recommended_items:
                 rewards[(state, action)] -= self.variety_weight
@@ -79,14 +90,20 @@ def modify_mdp_planner():
             if not valid_actions:
                 valid_actions = self.actions.copy()
             
+            # Filter out items in cooldown
+            current_time = datetime.now()
+            valid_actions = [a for a in valid_actions 
+                           if a not in self.item_cooldown or 
+                           (current_time - self.item_cooldown[a]).days >= self.cooldown_days]
+            
             # Filter out recently recommended items if possible
             fresh_actions = [a for a in valid_actions if a not in self.recommended_items]
             
             if fresh_actions and len(fresh_actions) > 1:
                 action = np.random.choice(fresh_actions)
             else:
-                # If all actions have been recommended, choose randomly
-                action = np.random.choice(valid_actions)
+                # If all actions have been recommended, choose randomly from valid actions
+                action = np.random.choice(valid_actions) if valid_actions else np.random.choice(self.actions)
             
             # Find the item
             for idx, row in self.food_db.iterrows():
@@ -94,6 +111,7 @@ def modify_mdp_planner():
                 if food_id == action:
                     # Update tracking
                     self.recommended_items.add(action)
+                    self.item_cooldown[action] = datetime.now()
                     if meal_type:
                         if meal_type not in self.meal_type_history:
                             self.meal_type_history[meal_type] = []
@@ -111,32 +129,20 @@ def modify_mdp_planner():
                     # Return the food item
                     return row.to_dict()
         
-        # If not exploring or exploration failed, use the original method
-        result = original_recommend(self, current_state, meal_type)
-        
-        # Update our tracking if we got a result
-        if result and 'food_id' in result:
-            food_id = result['food_id']
-            self.recommended_items.add(food_id)
-            if meal_type:
-                if meal_type not in self.meal_type_history:
-                    self.meal_type_history[meal_type] = []
-                self.meal_type_history[meal_type].append(food_id)
-        
-        return result
+        # If not exploring, use the original recommendation method
+        return original_recommend(self, current_state, meal_type)
     
-    # Replace the recommend_meal method
+    # Replace the recommend method
     MealPlannerMDP.recommend_meal = enhanced_recommend
     
-    # Enhance the update_from_feedback method
+    # Enhance the feedback method
     original_feedback = MealPlannerMDP.update_from_feedback
     
-    def enhanced_feedback(self, meal_id, rating, food_id=None):
-        """Enhanced feedback processing with stronger learning"""
-        # Call original method
-        original_feedback(self, meal_id, rating, food_id)
+    def enhanced_feedback(self, meal_id: str, rating: int, food_id: str = None):
+        """Enhanced feedback processing with stronger variety enforcement"""
+        # Scale rating to our reward system (-5 to +5)
+        scaled_rating = (rating - 3) * 2.5
         
-        # Additional feedback processing
         # Find the meal in history
         meal_entry = None
         for entry in self.meal_history:
@@ -145,20 +151,17 @@ def modify_mdp_planner():
                 break
         
         if not meal_entry:
+            logger.warning(f"Meal {meal_id} not found in history, feedback ignored")
             return
-            
-        # Get state and action
+        
+        # Get state and action from the meal entry
         state = meal_entry['state']
         action = meal_entry['food_id']
-        meal_type = meal_entry.get('meal_type', 'breakfast')
-        
-        # Scale rating to -1 to 1 for easier processing
-        scaled_rating = (rating - 3) / 2.0
+        meal_type = meal_entry.get('meal_type', '')
         
         # If negative rating, add to avoid list with higher weight
         if scaled_rating < 0:
             # Make it less likely to recommend this item for this meal type again
-            # by updating our meal type history to make it appear as if we just recommended it
             if meal_type in self.meal_type_history:
                 # Add it multiple times based on how negative the rating was
                 times_to_add = max(1, int(-scaled_rating * 5))
@@ -168,6 +171,9 @@ def modify_mdp_planner():
             # Update the reward more aggressively
             if (state, action) in self.rewards:
                 self.rewards[(state, action)] += scaled_rating * 5.0
+            
+            # Add to cooldown with extended period
+            self.item_cooldown[action] = datetime.now() - timedelta(days=self.cooldown_days - 1)
         elif scaled_rating > 0:
             # For positive ratings, make similar items more likely
             try:
