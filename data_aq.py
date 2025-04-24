@@ -5,10 +5,6 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 
-print("adnan adnan")
-print("Akshay Kulkarni")
-print("hello")
-print("test")
 
 # Sample data structure for food items
 food_data = {
