@@ -3,6 +3,10 @@ import pandas as pd
 import numpy as np
 import json
 import os
+from modify_mdp_planner import modify_mdp_planner
+
+# Apply the MDP modifications
+EnhancedMealPlannerMDP = modify_mdp_planner()
 
 def load_food_data_from_json(file_path):
     """
@@ -59,40 +63,26 @@ def load_food_data_from_json(file_path):
         
         # Process specific fields for compatibility
         processed_items = []
-        for item in all_food_items:
-            processed_item = item.copy()
+        for _, row in food_df.iterrows():
+            item = row.to_dict()
             
-            # Make sure categories are lists
-            if 'category' not in processed_item or processed_item['category'] is None:
-                processed_item['category'] = ['healthy']
-            elif isinstance(processed_item['category'], str):
-                processed_item['category'] = [processed_item['category']]
-                
-            # Make sure ingredients are lists
-            if 'ingredients' not in processed_item or processed_item['ingredients'] is None:
-                processed_item['ingredients'] = []
-            elif isinstance(processed_item['ingredients'], str):
-                processed_item['ingredients'] = [processed_item['ingredients']]
-                
-            # Make sure name and description are strings
-            for field in ['name', 'description']:
-                if field not in processed_item or processed_item[field] is None:
-                    processed_item[field] = ""
-                processed_item[field] = str(processed_item[field])
-                
-            # Create a full_description field
-            processed_item['full_description'] = f"{processed_item['name']} {processed_item['description']}"
+            # Ensure required fields exist
+            if 'food_id' not in item:
+                item['food_id'] = f"F{food_id_counter:03d}"
+                food_id_counter += 1
             
-            processed_items.append(processed_item)
+            if 'category' not in item:
+                item['category'] = ['healthy']
             
-        # Create a new DataFrame with processed items
-        food_df = pd.DataFrame(processed_items)
+            if 'ingredients' not in item:
+                item['ingredients'] = []
+            
+            processed_items.append(item)
         
-        print(f"Loaded {len(food_df)} food items from {file_path}")
-        return food_df
+        return pd.DataFrame(processed_items)
         
     except Exception as e:
-        print(f"Error loading food data from {file_path}: {e}")
+        print(f"Error loading food data: {e}")
         return pd.DataFrame()
 
 def test_meal_recommendation_system():
@@ -190,7 +180,8 @@ def test_meal_recommendation_system():
         }
     }
     
-    system.initialize_meal_planner(user_preferences)
+    # Use the enhanced MDP planner
+    system.meal_planner = EnhancedMealPlannerMDP(system.food_db, user_preferences)
     
     meal_plan = system.recommend_meals(days=10)
     print("MDP meal plan results:")
@@ -238,24 +229,36 @@ def test_meal_recommendation_system():
     # 5. Test user feedback
     print("\n5. Testing user feedback loop...")
     
-    # Get a food ID from history
-    if system.user_history:
-        food_id = system.user_history[0]['food_id']
-        print(f"Providing feedback for: {food_id}")
-        
-        # Give a high rating
-        system.process_user_feedback(food_id, rating=5, consumed=True)
-        print("Feedback processed - high rating (5)")
-        
-        # Get another food ID and give a low rating
-        if len(system.user_history) > 1:
-            food_id = system.user_history[1]['food_id']
-            print(f"Providing feedback for: {food_id}")
-            system.process_user_feedback(food_id, rating=2, consumed=True)
-            print("Feedback processed - low rating (2)")
+    # Reset meal history to start fresh
+    system.meal_planner.reset_meal_history()
     
-    print("\n=== Test completed successfully ===")
-    return system
+    # Generate a new plan
+    new_plan = system.recommend_meals(days=2)
+    
+    # Give feedback on a few items
+    if new_plan and len(new_plan) > 0 and len(new_plan[0]) > 0:
+        # Like the first breakfast
+        breakfast_id = new_plan[0][0].get('food_id')
+        print(f"Giving positive feedback (rating 5) to: {new_plan[0][0].get('name')}")
+        system.meal_planner.update_from_feedback(breakfast_id, 5)
+        
+        # Dislike the first dinner
+        if len(new_plan[0]) >= 3:
+            dinner_id = new_plan[0][2].get('food_id')
+            print(f"Giving negative feedback (rating 1) to: {new_plan[0][2].get('name')}")
+            system.meal_planner.update_from_feedback(dinner_id, 1)
+    
+    # Generate another plan after feedback
+    print("\nGenerating new plan after feedback...")
+    feedback_plan = system.recommend_meals(days=2)
+    
+    # Print the new plan
+    for day, meals in enumerate(feedback_plan, 1):
+        print(f"\nDay {day}:")
+        for i, meal in enumerate(meals):
+            if i < len(["Breakfast", "Lunch", "Dinner"]):
+                meal_type = ["Breakfast", "Lunch", "Dinner"][i]
+                print(f"  {meal_type}: {meal.get('name')}")
 
 if __name__ == "__main__":
     test_meal_recommendation_system()
