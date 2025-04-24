@@ -4,6 +4,8 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+import os
+from datetime import datetime
 
 def scrape_dining_hall(url, hall_name):
     """Scrape food names from a specific dining hall"""
@@ -220,24 +222,32 @@ def main():
         "Runk": "https://virginia.campusdish.com/LocationsAndMenus/Runk"
     }
     
-    # Store all results
-    all_food_items = {}
+    # Store current scrape results
+    current_food_items = {}
+    
+    # Add timestamp for the current scrape
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     # Scrape each dining hall
     for hall_name, url in dining_halls.items():
         food_items = scrape_dining_hall(url, hall_name)
-        all_food_items[hall_name] = food_items
+        
+        # Store only the current results
+        current_food_items[hall_name] = {
+            "timestamp": timestamp,
+            "items": food_items
+        }
         
         # Print results for this dining hall
         print(f"\n{hall_name} - {len(food_items)} items found:")
         for food in food_items:
             print(f"  - {food}")
     
-    # Save all results to a single JSON file
+    # Save only the current results to JSON file, completely replacing previous data
     with open("uva_dining_foods.json", 'w') as f:
-        json.dump(all_food_items, f, indent=4)
+        json.dump(current_food_items, f, indent=4)
     
-    print("\nAll dining hall data saved to uva_dining_foods.json")
+    print(f"\nDining hall data updated in uva_dining_foods.json")
 
 if __name__ == "__main__":
     main()
