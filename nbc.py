@@ -350,8 +350,16 @@ class EnhancedFoodCategorizer:
     def _encode_labels(self, categories):
         """Encode categories for model training"""
         if self.multi_label:
+            # For multi-label, ensure categories is a list of lists
+            if isinstance(categories.iloc[0], str):
+                # Convert string categories to list of lists
+                categories = [[cat] for cat in categories]
             return self.label_encoder.fit_transform(categories)
         else:
+            # For single-label, ensure categories is a list of strings
+            if isinstance(categories.iloc[0], list):
+                # Take first category from each list
+                categories = [cat[0] if cat else 'healthy' for cat in categories]
             return self.label_encoder.fit_transform(categories)
     
     def train(self, food_db: pd.DataFrame, params: Dict = None):
@@ -460,8 +468,17 @@ class EnhancedFoodCategorizer:
         # Decode predictions back to category names
         if not return_proba:
             if self.multi_label:
-                return [self.label_encoder.classes_[pred].tolist() for pred in text_preds]
+                # For multi-label, convert predictions to list of category names
+                if isinstance(text_preds, np.ndarray) and text_preds.ndim == 2:
+                    # Convert binary predictions to category names
+                    return [self.label_encoder.classes_[np.where(pred == 1)[0]].tolist() 
+                           for pred in text_preds]
+                else:
+                    # Handle single prediction case
+                    return [self.label_encoder.classes_[np.where(pred == 1)[0]].tolist() 
+                           for pred in [text_preds]]
             else:
+                # For single-label, directly inverse transform
                 return self.label_encoder.inverse_transform(text_preds)
         
         return text_preds

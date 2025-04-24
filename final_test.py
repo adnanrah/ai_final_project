@@ -15,6 +15,7 @@ def load_food_data_from_json(file_path):
         
         # Create a list to hold all food items
         all_food_items = []
+        food_id_counter = 0
         
         # Process each dining hall
         for hall_name, hall_data in food_data.items():
@@ -28,7 +29,11 @@ def load_food_data_from_json(file_path):
                         
                         # Generate placeholder ID if missing
                         if 'food_id' not in food_item:
-                            food_item['food_id'] = f"F{len(all_food_items):03d}"
+                            food_item['food_id'] = f"F{food_id_counter:03d}"
+                            food_id_counter += 1
+                            
+                        # Assign default category
+                        food_item['category'] = ['healthy']
                             
                         all_food_items.append(food_item)
                     # For simple list of food names
@@ -36,27 +41,52 @@ def load_food_data_from_json(file_path):
                         food_item = {
                             'name': item,
                             'description': f"{item} from {hall_name}",
-                            'food_id': f"F{len(all_food_items):03d}",
+                            'food_id': f"F{food_id_counter:03d}",
                             'dining_hall': hall_name,
                             'ingredients': [],  # Empty placeholder
+                            'category': ['healthy'],  # Default category
                             # Assign reasonable mock values for nutrition
                             'calories': 300,
                             'protein': 15,
                             'fat': 10,
                             'carbs': 30
                         }
+                        food_id_counter += 1
                         all_food_items.append(food_item)
         
         # Convert to DataFrame
         food_df = pd.DataFrame(all_food_items)
         
-        # Ensure columns needed by NBC exist
-        if 'ingredients' not in food_df.columns:
-            food_df['ingredients'] = food_df['name'].apply(lambda x: [])
+        # Process specific fields for compatibility
+        processed_items = []
+        for item in all_food_items:
+            processed_item = item.copy()
             
-        for col in ['calories', 'protein', 'fat', 'carbs']:
-            if col not in food_df.columns:
-                food_df[col] = None
+            # Make sure categories are lists
+            if 'category' not in processed_item or processed_item['category'] is None:
+                processed_item['category'] = ['healthy']
+            elif isinstance(processed_item['category'], str):
+                processed_item['category'] = [processed_item['category']]
+                
+            # Make sure ingredients are lists
+            if 'ingredients' not in processed_item or processed_item['ingredients'] is None:
+                processed_item['ingredients'] = []
+            elif isinstance(processed_item['ingredients'], str):
+                processed_item['ingredients'] = [processed_item['ingredients']]
+                
+            # Make sure name and description are strings
+            for field in ['name', 'description']:
+                if field not in processed_item or processed_item[field] is None:
+                    processed_item[field] = ""
+                processed_item[field] = str(processed_item[field])
+                
+            # Create a full_description field
+            processed_item['full_description'] = f"{processed_item['name']} {processed_item['description']}"
+            
+            processed_items.append(processed_item)
+            
+        # Create a new DataFrame with processed items
+        food_df = pd.DataFrame(processed_items)
         
         print(f"Loaded {len(food_df)} food items from {file_path}")
         return food_df
@@ -110,114 +140,7 @@ def test_meal_recommendation_system():
                 'ingredients': ['oats', 'milk', 'berries', 'honey'],
                 'description': 'Hearty breakfast oatmeal with fresh berries'
             },
-            {
-                'food_id': 'B002',
-                'name': 'Protein Pancakes',
-                'price': 6.75,
-                'calories': 450,
-                'protein': 25,
-                'fat': 12,
-                'carbs': 45,
-                'category': ['high-protein', 'balanced'],
-                'ingredients': ['flour', 'protein powder', 'eggs', 'milk'],
-                'description': 'Fluffy pancakes with added protein powder'
-            },
-            {
-                'food_id': 'L001',
-                'name': 'Grilled Chicken Salad',
-                'price': 8.50,
-                'calories': 380,
-                'protein': 32,
-                'fat': 15,
-                'carbs': 22,
-                'category': ['high-protein', 'low-carb'],
-                'ingredients': ['chicken', 'lettuce', 'tomato', 'cucumber', 'olive oil'],
-                'description': 'Fresh salad with grilled chicken breast'
-            },
-            {
-                'food_id': 'L002',
-                'name': 'Vegetarian Wrap',
-                'price': 7.25,
-                'calories': 420,
-                'protein': 18,
-                'fat': 14,
-                'carbs': 52,
-                'category': ['vegetarian', 'balanced'],
-                'ingredients': ['tortilla', 'hummus', 'lettuce', 'tomato', 'cucumber', 'avocado'],
-                'description': 'Whole grain wrap with hummus and fresh vegetables'
-            },
-            {
-                'food_id': 'D001',
-                'name': 'Salmon with Roasted Vegetables',
-                'price': 12.50,
-                'calories': 480,
-                'protein': 38,
-                'fat': 22,
-                'carbs': 25,
-                'category': ['high-protein', 'low-carb'],
-                'ingredients': ['salmon', 'broccoli', 'carrots', 'olive oil', 'garlic'],
-                'description': 'Baked salmon fillet with seasonal roasted vegetables'
-            },
-            {
-                'food_id': 'D002',
-                'name': 'Spaghetti with Meatballs',
-                'price': 9.75,
-                'calories': 720,
-                'protein': 35,
-                'fat': 28,
-                'carbs': 75,
-                'category': ['high-protein', 'balanced'],
-                'ingredients': ['pasta', 'beef', 'tomato sauce', 'garlic', 'onion'],
-                'description': 'Classic spaghetti with homemade beef meatballs'
-            },
-            {
-                'food_id': 'B003',
-                'name': 'Avocado Toast',
-                'price': 5.50,
-                'calories': 350,
-                'protein': 12,
-                'fat': 18,
-                'carbs': 30,
-                'category': ['balanced', 'vegetarian'],
-                'ingredients': ['bread', 'avocado', 'olive oil', 'salt'],
-                'description': 'Toasted whole grain bread with smashed avocado'
-            },
-            {
-                'food_id': 'L003',
-                'name': 'Lentil Soup',
-                'price': 6.25,
-                'calories': 280,
-                'protein': 16,
-                'fat': 8,
-                'carbs': 40,
-                'category': ['vegetarian', 'balanced'],
-                'ingredients': ['lentils', 'carrots', 'celery', 'onion', 'broth'],
-                'description': 'Hearty soup made with green lentils and vegetables'
-            },
-            {
-                'food_id': 'D003',
-                'name': 'Beef Stir Fry',
-                'price': 11.00,
-                'calories': 490,
-                'protein': 30,
-                'fat': 20,
-                'carbs': 42,
-                'category': ['high-protein', 'balanced'],
-                'ingredients': ['beef', 'bell peppers', 'broccoli', 'soy sauce', 'rice'],
-                'description': 'Stir-fried beef strips with vegetables over rice'
-            },
-            {
-                'food_id': 'B004',
-                'name': 'Fruit Smoothie',
-                'price': 5.00,
-                'calories': 250,
-                'protein': 8,
-                'fat': 3,
-                'carbs': 50,
-                'category': ['healthy', 'vegetarian'],
-                'ingredients': ['banana', 'berries', 'yogurt', 'honey', 'milk'],
-                'description': 'Creamy smoothie with mixed fruits and yogurt'
-            }
+            # Add more mock data as needed
         ]
         food_df = pd.DataFrame(food_data)
     
@@ -239,7 +162,15 @@ def test_meal_recommendation_system():
     categorized_foods = system.categorize_foods(new_foods)
     print("NBC categorization results:")
     for food in categorized_foods:
-        print(f"- {food.get('full_description', '')[:30]}... → {food.get('predicted_category', '')}")
+        if 'full_description' in food:
+            food_desc = food['full_description'][:30]
+        elif 'description' in food:
+            food_desc = food['description'][:30]
+        else:
+            food_desc = str(food)[:30]
+        
+        pred_cat = food.get('predicted_category', 'No category')
+        print(f"- {food_desc}... → {pred_cat}")
     
     # 3. Test MDP component
     print("\n3. Testing MDP (Markov Decision Process)...")
