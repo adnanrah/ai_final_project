@@ -354,7 +354,15 @@ class EnhancedFoodCategorizer:
             if isinstance(categories.iloc[0], str):
                 # Convert string categories to list of lists
                 categories = [[cat] for cat in categories]
-            return self.label_encoder.fit_transform(categories)
+            elif isinstance(categories.iloc[0], list):
+                # Ensure each category is a list
+                categories = [cat if isinstance(cat, list) else [cat] for cat in categories]
+            
+            # Fit the encoder and transform
+            self.label_encoder.fit(self.categories)  # Fit on all possible categories
+            encoded = self.label_encoder.transform(categories)
+            # Convert to 1D array by taking the first category for each item
+            return np.array([np.argmax(row) for row in encoded])
         else:
             # For single-label, ensure categories is a list of strings
             if isinstance(categories.iloc[0], list):

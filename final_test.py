@@ -192,7 +192,7 @@ def test_meal_recommendation_system():
     
     system.initialize_meal_planner(user_preferences)
     
-    meal_plan = system.recommend_meals(days=2)
+    meal_plan = system.recommend_meals(days=5)
     print("MDP meal plan results:")
     for day, meals in enumerate(meal_plan, 1):
         print(f"\nDay {day}:")
