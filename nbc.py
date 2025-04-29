@@ -123,8 +123,8 @@ class EnhancedFoodCategorizer:
         # Define possible food categories
         self.categories = [
             'healthy', 'high-protein', 'low-carb', 'vegetarian', 
-            'vegan', 'gluten-free', 'dairy-free', 'budget-friendly', 
-            'keto', 'paleo', 'mediterranean', 'whole30', 'balanced'
+            'vegan', 'gluten-free', 'dairy-free',
+            'keto', 'balanced'
         ]
         
         # Define nutrition thresholds for category assignment
@@ -325,11 +325,6 @@ class EnhancedFoodCategorizer:
             # Dairy-free
             if not any(p in str(ingredients).lower() for p in dairy_products):
                 categories.append('dairy-free')
-            
-            # Budget-friendly
-            if 'price' in row and not pd.isna(row['price']):
-                if float(row['price']) < 5.0:
-                    categories.append('budget-friendly')
             
             # Balanced category
             if ('protein' in row and 'carbs' in row and 'fat' in row and
