@@ -5,7 +5,7 @@ There are several ways to run the meal planning system:
 
 1. Main Test Script
 
-The final_test.py script demonstrates the full functionality of the system. This will load the food database from available JSON files, initialize and train the food categorizer, generate a 10-day meal plan, and test the feedback loop system.
+The final_test.py script demonstrates the full functionality of the system. This will load the food database from available JSON files, initialize and train the food categorizer, generate a 10-day meal plan, and test the feedback loop system. This, however, does not run the scraper and instead takes data from a JSON file (uva_dining_foods_enriched.json) that has food and nutritional information. 
 
 python final_test.py
 
