@@ -4,6 +4,7 @@ import numpy as np
 import json
 import os
 from modify_mdp_planner import modify_mdp_planner
+from nbc import EnhancedFoodCategorizer  # Add this import
 
 # Apply the MDP modifications
 EnhancedMealPlannerMDP = modify_mdp_planner()
@@ -35,20 +36,74 @@ def load_food_data_from_json(file_path):
                         if 'food_id' not in food_item:
                             food_item['food_id'] = f"F{food_id_counter:03d}"
                             food_id_counter += 1
+                        
+                        # If category exists, keep it; otherwise it will be determined by the classifier
+                        if 'category' not in food_item:
+                            # Try to infer a preliminary category from the name or ingredients
+                            # This will help the classifier have some initial data to work with
+                            name = food_item.get('name', '').lower()
+                            ingredients = food_item.get('ingredients', [])
                             
-                        # Assign default category
-                        food_item['category'] = ['healthy']
+                            if isinstance(ingredients, list):
+                                ingredients_str = ' '.join(ingredients).lower()
+                            else:
+                                ingredients_str = str(ingredients).lower()
+                            
+                            # Make a preliminary categorization guess
+                            prelim_categories = []
+                            
+                            # Check for breakfast items
+                            breakfast_terms = ['egg', 'bacon', 'sausage', 'pancake', 'waffle', 
+                                              'toast', 'bagel', 'breakfast', 'cereal', 'oatmeal']
+                            if any(term in name for term in breakfast_terms) or \
+                               any(term in ingredients_str for term in breakfast_terms):
+                                prelim_categories.append('breakfast')
+                            
+                            # Check for protein-rich items
+                            protein_terms = ['chicken', 'beef', 'pork', 'fish', 'tofu', 'egg', 
+                                           'turkey', 'protein', 'meat', 'cheese']
+                            if any(term in name for term in protein_terms) or \
+                               any(term in ingredients_str for term in protein_terms):
+                                if 'protein' in food_item and food_item['protein'] >= 15:
+                                    prelim_categories.append('high-protein')
+                                else:
+                                    prelim_categories.append('balanced')
+                            
+                            # Check for vegetarian items
+                            meat_terms = ['chicken', 'beef', 'pork', 'fish', 'meat', 'bacon', 'sausage']
+                            if not any(term in name for term in meat_terms) and \
+                               not any(term in ingredients_str for term in meat_terms):
+                                prelim_categories.append('vegetarian')
+                            
+                            # If we have no categories yet, assign balanced as a default
+                            if not prelim_categories:
+                                prelim_categories.append('balanced')
+                            
+                            food_item['category'] = prelim_categories
                             
                         all_food_items.append(food_item)
                     # For simple list of food names
                     else:
+                        # For simple strings, make a more intelligent initial category assessment
+                        name = item.lower()
+                        
+                        # Determine preliminary category based on food name
+                        if any(term in name for term in ['egg', 'bacon', 'sausage', 'pancake', 'waffle', 'toast']):
+                            prelim_category = ['breakfast']
+                        elif any(term in name for term in ['salad', 'vegetable', 'fruit']):
+                            prelim_category = ['healthy']
+                        elif any(term in name for term in ['chicken', 'beef', 'pork', 'turkey']):
+                            prelim_category = ['high-protein']
+                        else:
+                            prelim_category = ['balanced']
+                        
                         food_item = {
                             'name': item,
                             'description': f"{item} from {hall_name}",
                             'food_id': f"F{food_id_counter:03d}",
                             'dining_hall': hall_name,
                             'ingredients': [],  # Empty placeholder
-                            'category': ['healthy'],  # Default category
+                            'category': prelim_category,
                             # Assign reasonable mock values for nutrition
                             'calories': 300,
                             'protein': 15,
@@ -71,8 +126,9 @@ def load_food_data_from_json(file_path):
                 item['food_id'] = f"F{food_id_counter:03d}"
                 food_id_counter += 1
             
+            # Ensure category is present, but don't override existing categories
             if 'category' not in item:
-                item['category'] = ['healthy']
+                item['category'] = ['balanced']
             
             if 'ingredients' not in item:
                 item['ingredients'] = []
@@ -126,11 +182,34 @@ def test_meal_recommendation_system():
                 'protein': 12,
                 'fat': 6,
                 'carbs': 54,
-                'category': ['healthy', 'balanced'],
+                'category': ['breakfast', 'balanced'],
                 'ingredients': ['oats', 'milk', 'berries', 'honey'],
                 'description': 'Hearty breakfast oatmeal with fresh berries'
             },
-            # Add more mock data as needed
+            {
+                'food_id': 'L001',
+                'name': 'Grilled Chicken Salad',
+                'price': 8.50,
+                'calories': 380,
+                'protein': 32,
+                'fat': 15,
+                'carbs': 22,
+                'category': ['high-protein', 'healthy'],
+                'ingredients': ['chicken', 'lettuce', 'tomato', 'cucumber', 'olive oil'],
+                'description': 'Fresh salad with grilled chicken'
+            },
+            {
+                'food_id': 'D001',
+                'name': 'Tofu Stir-fry',
+                'price': 9.25,
+                'calories': 320,
+                'protein': 18,
+                'fat': 14,
+                'carbs': 28,
+                'category': ['vegetarian', 'vegan', 'healthy'],
+                'ingredients': ['tofu', 'broccoli', 'carrots', 'bell pepper', 'soy sauce'],
+                'description': 'Tofu with mixed vegetables'
+            },
         ]
         food_df = pd.DataFrame(food_data)
     
@@ -140,7 +219,67 @@ def test_meal_recommendation_system():
     
     # 2. Test NBC component
     print("\n2. Testing NBC (Naive Bayes Classifier)...")
-    system.initialize_categorizer(multi_label=True)
+    
+    # Create and pre-train the categorizer with sample data
+    system.food_categorizer = EnhancedFoodCategorizer(multi_label=True)
+    
+    # Add sample training data to help classifier recognize food categories
+    pretrain_data = [
+        {
+            'name': 'Scrambled Eggs',
+            'description': 'Fluffy scrambled eggs cooked with butter',
+            'ingredients': ['eggs', 'milk', 'butter', 'salt', 'pepper'],
+            'calories': 210,
+            'protein': 14,
+            'fat': 16,
+            'carbs': 2,
+            'category': ['breakfast', 'high-protein']
+        },
+        {
+            'name': 'Grilled Chicken Salad',
+            'description': 'Fresh salad with grilled chicken breast',
+            'ingredients': ['chicken', 'lettuce', 'tomato', 'cucumber', 'olive oil'],
+            'calories': 380,
+            'protein': 32,
+            'fat': 15,
+            'carbs': 22,
+            'category': ['high-protein', 'healthy']
+        },
+        {
+            'name': 'Yogurt and Berries',
+            'description': 'Greek yogurt with mixed berries and honey',
+            'ingredients': ['yogurt', 'strawberries', 'blueberries', 'honey'],
+            'calories': 220,
+            'protein': 12,
+            'fat': 8,
+            'carbs': 25,
+            'category': ['breakfast', 'healthy']
+        },
+        {
+            'name': 'Tofu Stir-fry',
+            'description': 'Stir-fried tofu with mixed vegetables',
+            'ingredients': ['tofu', 'broccoli', 'carrots', 'bell pepper', 'soy sauce'],
+            'calories': 320,
+            'protein': 18,
+            'fat': 14,
+            'carbs': 28,
+            'category': ['vegetarian', 'vegan', 'healthy']
+        },
+        {
+            'name': 'Bagel with Cream Cheese',
+            'description': 'Fresh bagel with cream cheese spread',
+            'ingredients': ['bagel', 'cream cheese'],
+            'calories': 350,
+            'protein': 12,
+            'fat': 9,
+            'carbs': 54,
+            'category': ['breakfast']
+        }
+    ]
+    
+    # Train on combined data
+    train_df = pd.concat([pd.DataFrame(pretrain_data), food_df], ignore_index=True)
+    system.food_categorizer.train(train_df)
     
     # Test categorizing new foods
     new_foods = [
@@ -160,6 +299,8 @@ def test_meal_recommendation_system():
             food_desc = str(food)[:30]
         
         pred_cat = food.get('predicted_category', 'No category')
+        if isinstance(pred_cat, list):
+            pred_cat = ', '.join(pred_cat)
         print(f"- {food_desc}... → {pred_cat}")
     
     # 3. Test MDP component
@@ -197,7 +338,7 @@ def test_meal_recommendation_system():
                 print(f"    Category: {categories}")
             print(f"    Nutrition: {meal.get('calories', 'N/A')} cal, {meal.get('protein', 'N/A')}g protein")
     
-    # 4. Test the full workflow with new food items
+    # 4. Testing full workflow with new food items
     print("\n4. Testing full workflow with new food items...")
     
     # Foods to add
@@ -221,12 +362,17 @@ def test_meal_recommendation_system():
                 for i, meal in enumerate(meals):
                     meal_type = ["Breakfast", "Lunch", "Dinner"][i]
                     print(f"  {meal_type}: {meal['name']}")
+                    if 'category' in meal:
+                        categories = meal['category']
+                        if isinstance(categories, list):
+                            categories = ', '.join(categories)
+                        print(f"    Category: {categories}")
     else:
         print("Workflow had errors:")
         for error in results['errors']:
             print(f"- {error}")
     
-    # 5. Test user feedback
+    # 5. Testing user feedback
     print("\n5. Testing user feedback loop...")
     
     # Reset meal history to start fresh
@@ -256,9 +402,13 @@ def test_meal_recommendation_system():
     for day, meals in enumerate(feedback_plan, 1):
         print(f"\nDay {day}:")
         for i, meal in enumerate(meals):
-            if i < len(["Breakfast", "Lunch", "Dinner"]):
-                meal_type = ["Breakfast", "Lunch", "Dinner"][i]
-                print(f"  {meal_type}: {meal.get('name')}")
+            meal_type = ["Breakfast", "Lunch", "Dinner"][i]
+            print(f"  {meal_type}: {meal.get('name')}")
+            if 'category' in meal:
+                categories = meal['category']
+                if isinstance(categories, list):
+                    categories = ', '.join(categories)
+                print(f"    Category: {categories}")
 
 if __name__ == "__main__":
     test_meal_recommendation_system()

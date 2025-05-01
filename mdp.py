@@ -369,6 +369,26 @@ class MealPlannerMDP:
                 if state.startswith(('breakfast_', 'lunch_', 'dinner_')):
                     meal_type = state.split('_')[0]
                 
+                # Get food categories
+                food_category = food.get('category', [])
+                if isinstance(food_category, str):
+                    food_category = [food_category]
+                
+                # STRONG PENALTY for breakfast foods at lunch/dinner
+                if meal_type in ['lunch', 'dinner'] and 'breakfast' in food_category:
+                    reward -= 15.0  # Strong penalty to discourage breakfast foods at other meals
+                
+                # Reduce preference for vegetarian/vegan foods (unless user prefers them)
+                if 'vegetarian' in food_category or 'vegan' in food_category:
+                    # Check if user actually prefers vegetarian foods
+                    if 'vegetarian' in self.user_preferences.get('dietary_restrictions', []) or 'vegan' in self.user_preferences.get('dietary_restrictions', []):
+                        # User prefers vegetarian/vegan, so give slight bonus
+                        reward += 1.0
+                    else:
+                        # User doesn't specifically prefer vegetarian/vegan, so apply a small penalty
+                        # to balance out overrepresentation
+                        reward -= 2.0
+                
                 # 1. Reward for meeting nutrition goals based on meal type
                 if meal_type and meal_type in self.meal_distribution:
                     meal_targets = {}
@@ -398,6 +418,14 @@ class MealPlannerMDP:
                             else:  # carbs and fat
                                 # Reward for being close to target
                                 reward += 2.0 * (1.0 - min(abs(value / target - 1.0), 0.5) / 0.5)
+                
+                # MEAL-SPECIFIC CATEGORY BONUSES
+                if meal_type == 'breakfast' and 'breakfast' in food_category:
+                    reward += 5.0  # Strong bonus for breakfast foods at breakfast
+                elif meal_type == 'lunch' and any(cat in ['balanced', 'high-protein'] for cat in food_category):
+                    reward += 3.0  # Good bonus for appropriate lunch foods
+                elif meal_type == 'dinner' and any(cat in ['high-protein', 'low-carb'] for cat in food_category):
+                    reward += 3.0  # Good bonus for appropriate dinner foods
                 
                 # 2. Adjust rewards based on state context
                 if state.startswith('deficit_'):
@@ -741,8 +769,51 @@ class MealPlannerMDP:
                 logger.error("No actions available.")
                 return None
         else:
-            # Get the recommended action
+            # Get the recommended action from policy
             action = self.policy[state]
+        
+        # Verify meal type appropriateness
+        # If we're recommending for a specific meal type, make sure the food is appropriate
+        if meal_type:
+            # Get the food item from the action
+            food_item = None
+            for idx, row in self.food_db.iterrows():
+                food_id = row.get('food_id', str(idx))
+                if food_id == action:
+                    food_item = row.to_dict()
+                    break
+            
+            if food_item:
+                # Get the food's categories
+                categories = food_item.get('category', [])
+                if isinstance(categories, str):
+                    categories = [categories]
+                
+                # For lunch and dinner, we want to avoid breakfast foods
+                if meal_type in ['lunch', 'dinner'] and 'breakfast' in categories:
+                    # This is a breakfast food being recommended for lunch/dinner
+                    # Try up to 5 alternative foods that are more appropriate
+                    for _ in range(5):
+                        # Find alternative foods from the policy for other states
+                        for alt_state, alt_action in self.policy.items():
+                            if alt_state.startswith(f"{meal_type}_"):
+                                # Check if this food is a better match
+                                alt_food = None
+                                for idx, row in self.food_db.iterrows():
+                                    alt_food_id = row.get('food_id', str(idx))
+                                    if alt_food_id == alt_action:
+                                        alt_food = row.to_dict()
+                                        break
+                                
+                                if alt_food:
+                                    alt_categories = alt_food.get('category', [])
+                                    if isinstance(alt_categories, str):
+                                        alt_categories = [alt_categories]
+                                    
+                                    # If this food is not a breakfast food, use it instead
+                                    if 'breakfast' not in alt_categories:
+                                        action = alt_action
+                                        break
         
         # Get the food item
         for idx, row in self.food_db.iterrows():
@@ -794,6 +865,10 @@ class MealPlannerMDP:
         
         # Track recently used meals to avoid repetition
         recent_meals = set()
+        meal_type_history = {'breakfast': [], 'lunch': [], 'dinner': []}
+        
+        # Track foods by category to ensure variety
+        category_counts = defaultdict(int)
         
         # Plan meals
         meal_plan = []
@@ -808,40 +883,97 @@ class MealPlannerMDP:
             
             for meal_type in meal_types:
                 # Try to recommend a meal that hasn't been used recently
-                max_attempts = 5  # Limit attempts to avoid infinite loop
+                max_attempts = 8  # More attempts to find a good match
+                best_meal = None
+                best_score = float('-inf')
+                
                 for attempt in range(max_attempts):
                     meal = self.recommend_meal(meal_type=meal_type)
                     
                     if not meal:
                         break
-                        
-                    # Check if this meal was recently used
-                    meal_id = meal.get('food_id', str(meal.get('name', '')))
-                    if meal_id not in recent_meals:
-                        daily_meals.append(meal)
-                        recent_meals.add(meal_id)
-                        
-                        # Update daily nutrition consumed
-                        for nutrient in ['calories', 'protein', 'fat', 'carbs']:
-                            if nutrient in meal and not pd.isna(meal[nutrient]):
-                                self.daily_nutrition_consumed[nutrient] += float(meal[nutrient])
-                        
-                        # Update current state based on nutrition balance
-                        self._update_state_based_on_nutrition()
-                        break
                     
-                    # If we've tried too many times, just use the last recommendation
-                    if attempt == max_attempts - 1:
-                        daily_meals.append(meal)
-                        recent_meals.add(meal_id)
+                    # Get this meal's food ID
+                    meal_id = meal.get('food_id', str(meal.get('name', '')))
+                    
+                    # Calculate a variety score for this meal
+                    variety_score = 0
+                    
+                    # Heavily penalize recently used meals
+                    if meal_id in recent_meals:
+                        variety_score -= 10
+                    
+                    # Penalize recent use in this meal type
+                    if meal_id in meal_type_history[meal_type]:
+                        recency_index = meal_type_history[meal_type].index(meal_id)
+                        recency_penalty = len(meal_type_history[meal_type]) - recency_index
+                        variety_score -= recency_penalty
+                    
+                    # Get categories
+                    categories = meal.get('category', [])
+                    if isinstance(categories, str):
+                        categories = [categories]
+                    
+                    # Penalize overused categories
+                    for category in categories:
+                        if category_counts[category] > 0:
+                            variety_score -= category_counts[category]
+                    
+                    # For lunch and dinner, heavily penalize breakfast foods
+                    if meal_type in ['lunch', 'dinner'] and 'breakfast' in categories:
+                        variety_score -= 15
+                    
+                    # Special case: If no breakfast foods are available for breakfast,
+                    # don't heavily penalize non-breakfast foods
+                    if meal_type == 'breakfast' and 'breakfast' not in categories:
+                        # Check if we have any breakfast foods at all
+                        has_breakfast_foods = False
+                        for _, row in self.food_db.iterrows():
+                            row_categories = row.get('category', [])
+                            if isinstance(row_categories, str):
+                                row_categories = [row_categories]
+                            if 'breakfast' in row_categories:
+                                has_breakfast_foods = True
+                                break
                         
-                        # Update daily nutrition consumed
-                        for nutrient in ['calories', 'protein', 'fat', 'carbs']:
-                            if nutrient in meal and not pd.isna(meal[nutrient]):
-                                self.daily_nutrition_consumed[nutrient] += float(meal[nutrient])
-                        
-                        # Update current state based on nutrition balance
-                        self._update_state_based_on_nutrition()
+                        if not has_breakfast_foods:
+                            # If no breakfast foods exist, don't penalize non-breakfast foods
+                            variety_score += 5
+                    
+                    # Keep track of the best meal seen so far
+                    if variety_score > best_score or best_meal is None:
+                        best_meal = meal
+                        best_score = variety_score
+                
+                # Use the best meal we found
+                if best_meal:
+                    meal_id = best_meal.get('food_id', str(best_meal.get('name', '')))
+                    daily_meals.append(best_meal)
+                    recent_meals.add(meal_id)
+                    
+                    # Update meal type history
+                    if len(meal_type_history[meal_type]) >= 10:  # Keep last 10 items
+                        meal_type_history[meal_type].pop(0)  # Remove oldest
+                    meal_type_history[meal_type].append(meal_id)
+                    
+                    # Update category counts
+                    categories = best_meal.get('category', [])
+                    if isinstance(categories, str):
+                        categories = [categories]
+                    
+                    for category in categories:
+                        category_counts[category] += 1
+                    
+                    # Update daily nutrition consumed
+                    for nutrient in ['calories', 'protein', 'fat', 'carbs']:
+                        if nutrient in best_meal and not pd.isna(best_meal[nutrient]):
+                            self.daily_nutrition_consumed[nutrient] += float(best_meal[nutrient])
+                    
+                    # Update current state based on nutrition balance
+                    self._update_state_based_on_nutrition()
+                else:
+                    # If we couldn't find a good meal, add a placeholder
+                    daily_meals.append({'name': f"No suitable {meal_type} found", 'calories': 0, 'protein': 0})
             
             meal_plan.append(daily_meals)
         

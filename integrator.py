@@ -375,12 +375,12 @@ class MealRecommendationSystem:
             
             # Ensure the categorizer is trained
             if not hasattr(self.food_categorizer, 'trained') or not self.food_categorizer.trained:
-                if len(self.food_db) >= 10:
+                if len(self.food_db) >= 5:  # Lower threshold for training
                     logger.info("Training food categorizer on current database")
                     self.food_categorizer.train(self.food_db)
                 else:
-                    logger.warning("Not enough data to train categorizer")
-                    return []
+                    logger.warning("Not enough data to train categorizer, using rule-based categorization")
+                    # Continue with rule-based categorization even without training
             
             # Predict categories
             logger.info(f"Categorizing {len(items_to_categorize)} food items")
@@ -390,14 +390,51 @@ class MealRecommendationSystem:
             results = []
             for i, (_, item) in enumerate(items_to_categorize.iterrows()):
                 item_dict = item.to_dict()
-                item_dict['predicted_category'] = categories[i]
+                
+                # Add predicted category
+                if i < len(categories):
+                    item_dict['predicted_category'] = categories[i]
+                else:
+                    # Fallback if index out of range
+                    item_dict['predicted_category'] = ['balanced']
+                
+                # For items that don't have a category yet, set it to the predicted one
+                if 'category' not in item_dict or not item_dict['category']:
+                    item_dict['category'] = item_dict['predicted_category']
+                
                 results.append(item_dict)
             
             return results
             
         except Exception as e:
             logger.error(f"Error categorizing foods: {e}")
-            return []
+            
+            # Fallback when categorization fails
+            results = []
+            for _, item in items_to_categorize.iterrows():
+                item_dict = item.to_dict()
+                
+                # Use rule-based assignment as fallback
+                name = item_dict.get('name', '')
+                if isinstance(name, str):
+                    name = name.lower()
+                    
+                    if any(term in name for term in ['egg', 'bacon', 'sausage', 'pancake']):
+                        item_dict['predicted_category'] = ['breakfast']
+                    elif any(term in name for term in ['salad', 'vegetable']):
+                        item_dict['predicted_category'] = ['healthy']
+                    elif any(term in name for term in ['chicken', 'beef', 'protein']):
+                        item_dict['predicted_category'] = ['high-protein']
+                    else:
+                        item_dict['predicted_category'] = ['balanced']
+                    
+                    # For items that don't have a category yet, set it to the predicted one
+                    if 'category' not in item_dict or not item_dict['category']:
+                        item_dict['category'] = item_dict['predicted_category']
+                
+                results.append(item_dict)
+            
+            return results
     
     def update_food_categories(self, categorized_foods: List[Dict]) -> bool:
         """
@@ -412,21 +449,32 @@ class MealRecommendationSystem:
         try:
             count = 0
             for food in categorized_foods:
-                if 'food_id' in food and 'predicted_category' in food:
+                if 'food_id' in food:
                     food_id = food['food_id']
-                    new_category = food['predicted_category']
+                    new_category = food.get('predicted_category')
+                    
+                    # Skip if no predicted category
+                    if not new_category:
+                        continue
                     
                     # Update in database
                     mask = self.food_db['food_id'] == food_id
                     if mask.any():
                         self.food_db.loc[mask, 'category'] = new_category
                         count += 1
-                    
-                    # If meal planner exists, update it too
-                    if self.meal_planner:
-                        self.meal_planner.modify_food_category(food_id, new_category)
+                        
+                        # If meal planner exists, update it too
+                        if self.meal_planner and hasattr(self.meal_planner, 'modify_food_category'):
+                            category_str = new_category[0] if isinstance(new_category, list) and new_category else 'balanced'
+                            self.meal_planner.modify_food_category(food_id, category_str)
             
             logger.info(f"Updated categories for {count} foods")
+            
+            # If we updated a significant number of categories, retrain the classifier
+            if count > 5 and self.food_categorizer:
+                logger.info("Retraining classifier with updated categories")
+                self.food_categorizer.train(self.food_db)
+            
             return True
             
         except Exception as e:
