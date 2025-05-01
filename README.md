@@ -41,7 +41,8 @@ modify_mdp_planner.py: Enhances MDP with learning and variety features
 
 # Configuration
 User preferences can be configured in the code. Here's an example:
-pythonuser_preferences = {
+```python
+user_preferences = {
     'dietary_restrictions': ['vegetarian'],  # Options: vegetarian, vegan, gluten-free
     'nutrition_goals': {
         'calories': 2000,
