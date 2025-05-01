@@ -111,18 +111,6 @@
                 "retrieved_at": "2025-04-24 10:15:51"
             },
             {
-                "name": "Pancake Syrup",
-                "description": "Sweet maple-flavored syrup perfect for topping pancakes, waffles, or french toast",
-                "ingredients": ["corn syrup", "high fructose corn syrup", "water", "natural and artificial flavors", "salt"],
-                "calories": 210,
-                "protein": 0,
-                "fat": 0,
-                "carbs": 53,
-                "dining_hall": "Observatory Hill",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:15:52"
-            },
-            {
                 "name": "Sausage & Cheese Biscuit",
                 "description": "Flaky buttermilk biscuit filled with savory pork sausage and melted cheddar cheese",
                 "ingredients": ["flour", "butter", "buttermilk", "baking powder", "salt", "pork sausage", "cheddar cheese"],
@@ -171,90 +159,6 @@
                 "retrieved_at": "2025-04-24 10:15:56"
             },
             {
-                "name": "Shredded Cheddar Cheese",
-                "description": "Finely shredded sharp cheddar cheese perfect for topping eggs or breakfast potatoes",
-                "ingredients": ["cheddar cheese", "anti-caking agent"],
-                "calories": 110,
-                "protein": 7,
-                "fat": 9,
-                "carbs": 1,
-                "dining_hall": "Observatory Hill",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:15:57"
-            },
-            {
-                "name": "Chopped Fresh Spinach",
-                "description": "Vibrant green chopped spinach leaves, washed and ready to add to eggs or breakfast bowls",
-                "ingredients": ["spinach"],
-                "calories": 25,
-                "protein": 3,
-                "fat": 0.5,
-                "carbs": 4,
-                "dining_hall": "Observatory Hill",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:15:58"
-            },
-            {
-                "name": "Diced Mixed Bell Peppers",
-                "description": "Colorful mix of diced red, yellow, and green bell peppers for adding to omelets or breakfast bowls",
-                "ingredients": ["red bell peppers", "yellow bell peppers", "green bell peppers"],
-                "calories": 30,
-                "protein": 1,
-                "fat": 0.3,
-                "carbs": 7,
-                "dining_hall": "Observatory Hill",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:15:59"
-            },
-            {
-                "name": "Diced Onions",
-                "description": "Freshly diced white onions ready to add flavor to eggs, potatoes, or breakfast bowls",
-                "ingredients": ["white onions"],
-                "calories": 35,
-                "protein": 1,
-                "fat": 0.1,
-                "carbs": 8,
-                "dining_hall": "Observatory Hill",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:16:00"
-            },
-            {
-                "name": "Diced Tomatoes",
-                "description": "Juicy diced fresh tomatoes to add color and flavor to breakfast dishes",
-                "ingredients": ["tomatoes"],
-                "calories": 20,
-                "protein": 1,
-                "fat": 0.2,
-                "carbs": 4.5,
-                "dining_hall": "Observatory Hill",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:16:01"
-            },
-            {
-                "name": "Sliced Mushrooms",
-                "description": "Fresh sliced white button mushrooms sautéed lightly with herbs",
-                "ingredients": ["white mushrooms", "olive oil", "herbs"],
-                "calories": 40,
-                "protein": 3,
-                "fat": 2.5,
-                "carbs": 3,
-                "dining_hall": "Observatory Hill",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:16:02"
-            },
-            {
-                "name": "Diced Ham",
-                "description": "Smoky diced ham pieces perfect for adding to eggs, omelets, or breakfast bowls",
-                "ingredients": ["ham", "salt", "sugar", "sodium nitrite"],
-                "calories": 120,
-                "protein": 15,
-                "fat": 6,
-                "carbs": 1,
-                "dining_hall": "Observatory Hill",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:16:03"
-            },
-            {
                 "name": "Grits (6  fl oz)",
                 "description": "Creamy Southern-style grits cooked to a smooth consistency, served warm",
                 "ingredients": ["stone-ground corn grits", "water", "salt", "butter"],
@@ -301,42 +205,6 @@
                 "dining_hall": "Observatory Hill",
                 "error": "",
                 "retrieved_at": "2025-04-24 10:16:07"
-            },
-            {
-                "name": "Chocolate Syrup",
-                "description": "Rich chocolate syrup for drizzling over pancakes, waffles, or adding to beverages",
-                "ingredients": ["high fructose corn syrup", "corn syrup", "water", "cocoa", "sugar", "potassium sorbate", "salt", "vanilla"],
-                "calories": 110,
-                "protein": 0,
-                "fat": 0,
-                "carbs": 27,
-                "dining_hall": "Observatory Hill",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:16:08"
-            },
-            {
-                "name": "Powdered Sugar",
-                "description": "Fine powdered sugar for sprinkling over pancakes, waffles, or french toast",
-                "ingredients": ["sugar", "cornstarch"],
-                "calories": 30,
-                "protein": 0,
-                "fat": 0,
-                "carbs": 8,
-                "dining_hall": "Observatory Hill",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:16:09"
-            },
-            {
-                "name": "Pancake Syrup",
-                "description": "Sweet maple-flavored syrup perfect for topping pancakes, waffles, or french toast",
-                "ingredients": ["corn syrup", "high fructose corn syrup", "water", "natural and artificial flavors", "salt"],
-                "calories": 210,
-                "protein": 0,
-                "fat": 0,
-                "carbs": 53,
-                "dining_hall": "Observatory Hill",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:16:10"
             }
         ]
     },
@@ -426,18 +294,6 @@
                 "dining_hall": "Fresh Food Company",
                 "error": "",
                 "retrieved_at": "2025-04-24 10:16:17"
-            },
-            {
-                "name": "Diced Mixed Bell Peppers",
-                "description": "Colorful mix of diced red, yellow, and green bell peppers for adding to omelets or breakfast bowls",
-                "ingredients": ["red bell peppers", "yellow bell peppers", "green bell peppers"],
-                "calories": 30,
-                "protein": 1,
-                "fat": 0.3,
-                "carbs": 7,
-                "dining_hall": "Fresh Food Company",
-                "error": "",
-                "retrieved_at": "2025-04-24 10:16:18"
             },
             {
                 "name": "Apple Cinnamon Muffin",
