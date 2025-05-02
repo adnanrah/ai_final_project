@@ -18,19 +18,16 @@ try:
 except ImportError:
     print("Warning: The 'tqdm' package is not installed. Using simple progress indicator instead.")
     print("You can install tqdm using: pip install tqdm")
-    
     class SimpleTqdm:
         def __init__(self, iterable, desc=None):
             self.iterable = iterable
             self.total = len(iterable)
             self.desc = desc
             self.current = 0
-            
         def __iter__(self):
             if self.desc:
                 print(f"\n{self.desc}:")
             return self
-            
         def __next__(self):
             if self.current < self.total:
                 item = self.iterable[self.current]
@@ -40,7 +37,6 @@ except ImportError:
                     print(f"Progress: {self.current}/{self.total} ({percent:.1f}%)")
                 return item
             raise StopIteration
-    
     tqdm = SimpleTqdm
 
 API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -49,7 +45,7 @@ if openai is not None and API_KEY:
     client = openai.OpenAI(api_key=API_KEY)
 
 def load_food_data(filename="uva_dining_foods.json"):
-    """Load the scraped food data from JSON file"""
+    """Load scraped food data from JSON file"""
     try:
         with open(filename, 'r') as f:
             return json.load(f)
@@ -61,13 +57,13 @@ def load_food_data(filename="uva_dining_foods.json"):
         sys.exit(1)
 
 def save_enriched_data(data, filename="uva_dining_foods_enriched.json"):
-    """Save the enriched food data to a new JSON file"""
+    """Save enriched food data to JSON file"""
     with open(filename, 'w') as f:
         json.dump(data, f, indent=4)
     print(f"Enriched data saved to {filename}")
 
 def get_food_info_from_llm(food_name, dining_hall):
-    """Query the LLM for nutritional information about a food item"""
+    """Get nutritional information using LLM"""
     prompt = f"""
     I need detailed nutritional information about the food item "{food_name}" from a dining hall menu at the University of Virginia.
 
@@ -92,17 +88,14 @@ def get_food_info_from_llm(food_name, dining_hall):
         "carbs": 24
     }}
     """
-    
     try:
         if not API_KEY:
             raise Exception("No API key provided. Set OPENAI_API_KEY environment variable.")
-            
         if openai is None:
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {API_KEY}"
             }
-            
             payload = {
                 "model": "gpt-3.5-turbo",
                 "messages": [
@@ -111,16 +104,13 @@ def get_food_info_from_llm(food_name, dining_hall):
                 ],
                 "response_format": {"type": "json_object"}
             }
-            
             response = requests.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers=headers,
                 json=payload
             )
-            
             if response.status_code != 200:
                 raise Exception(f"API error: {response.status_code}, {response.text}")
-            
             response_data = response.json()
             nutrition_data = json.loads(response_data["choices"][0]["message"]["content"])
         else:
@@ -132,14 +122,10 @@ def get_food_info_from_llm(food_name, dining_hall):
                 ],
                 response_format={"type": "json_object"}
             )
-            
             nutrition_data = json.loads(response.choices[0].message.content)
-        
         nutrition_data["dining_hall"] = dining_hall
         nutrition_data["retrieved_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
         return nutrition_data
-        
     except Exception as e:
         print(f"Error querying LLM for {food_name}: {e}")
         return {
@@ -156,16 +142,14 @@ def get_food_info_from_llm(food_name, dining_hall):
         }
 
 def create_mock_food_info(food_name, dining_hall):
-    """Create realistic mock food data when API access isn't available"""
+    """Create realistic mock food data when API is unavailable"""
     ingredients = []
     calories = 0
     protein = 0
     fat = 0
     carbs = 0
     description = ""
-    
     food_lower = food_name.lower()
-    
     if "egg" in food_lower:
         description = "A classic breakfast dish made with farm fresh eggs"
         ingredients = ["eggs", "salt", "pepper"]
@@ -236,7 +220,6 @@ def create_mock_food_info(food_name, dining_hall):
         protein = 8
         fat = 7
         carbs = 25
-    
     return {
         "name": food_name,
         "description": description,
@@ -251,57 +234,43 @@ def create_mock_food_info(food_name, dining_hall):
     }
 
 def enrich_food_data(food_data, use_mock=False):
-    """Add nutritional information to food items from LLM or mock data"""
+    """Add nutritional info to food items"""
     enriched_data = {}
-    
     total_items = sum(len(hall_data["items"]) for hall_name, hall_data in food_data.items())
     processed_items = 0
-    
     print(f"Starting to enrich {total_items} food items with {'mock' if use_mock else 'LLM'} data...")
-    
     for hall_name, hall_data in food_data.items():
         print(f"\nProcessing {hall_name}...")
-        
         enriched_data[hall_name] = {
             "timestamp": hall_data["timestamp"],
             "items": []
         }
-        
         for food_name in tqdm(hall_data["items"], desc=hall_name):
             if use_mock:
                 food_info = create_mock_food_info(food_name, hall_name)
             else:
                 food_info = get_food_info_from_llm(food_name, hall_name)
-            
             enriched_data[hall_name]["items"].append(food_info)
-            
             processed_items += 1
-            
             if not use_mock:
                 time.sleep(0.5)
-            
             if not isinstance(tqdm, type) and processed_items % 10 == 0:
                 print(f"Processed {processed_items}/{total_items} items")
-    
     return enriched_data
 
 def main():
     print("Starting food data enrichment process...")
-    
     use_mock = False
     if not API_KEY:
         print("WARNING: No OpenAI API key found in environment variables.")
         print("Continuing with mock data generation instead of API calls.")
         use_mock = True
-    
     food_data = load_food_data()
     enriched_data = enrich_food_data(food_data, use_mock=use_mock)
     save_enriched_data(enriched_data)
-    
     if use_mock:
         print("\nNOTE: The saved data contains mock nutritional information for demonstration purposes.")
         print("To get actual nutritional estimates, set the OPENAI_API_KEY environment variable.")
-    
     print("Food data enrichment complete!")
 
 if __name__ == "__main__":
